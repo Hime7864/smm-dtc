@@ -1,0 +1,62 @@
+;
+; smm-dtc.inf
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System ; TODO: specify appropriate Class
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider    = %ManufacturerName%
+CatalogFile = smm-dtc.cat
+DriverVer   = ; TODO: set DriverVer in stampinf property pages
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+smm-dtc.sys = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName% = Standard,NT$ARCH$.10.0...16299 ; %13% support introduced in build 16299
+
+[Standard.NT$ARCH$.10.0...16299]
+%smm-dtc.DeviceDesc% = smm-dtc_Device, Root\smm-dtc ; TODO: edit hw-id
+
+[smm-dtc_Device.NT]
+CopyFiles = File_Copy
+
+[File_Copy]
+smm-dtc.sys
+
+;-------------- Service installation
+[smm-dtc_Device.NT.Services]
+AddService = smm-dtc,%SPSVCINST_ASSOCSERVICE%, smm-dtc_Service_Inst
+
+; -------------- smm-dtc driver install sections
+[smm-dtc_Service_Inst]
+DisplayName    = %smm-dtc.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\smm-dtc.sys
+
+[smm-dtc_Device.NT.Wdf]
+KmdfService = smm-dtc, smm-dtc_wdfsect
+
+[smm-dtc_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+ManufacturerName = "<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "smm-dtc Installation Disk"
+smm-dtc.DeviceDesc = "smm-dtc Device"
+smm-dtc.SVCDESC = "smm-dtc Service"

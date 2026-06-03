@@ -1,0 +1,24 @@
+# About
+
+This project is my attempt to detect the presence of SMM (System Management Mode) abuse from a kernel driver by leveraging the interplay of #SMI ↔ #NMI on AMD systems.
+
+A few months ago, I got a message from a friend telling me he was cheating in FACEIT. When I asked what he was doing, he told me it was this new thing called an "SMM cheat". From all my free time reading the APM/PPR, this should be impossible for many reasons. For one, ASP, TPM, and Secure Boot should all catch this — but they don't. This led me down the path of figuring out how they were actually doing it. The short version: motherboard manufacturers shipped slop code.
+
+## Why this problem exists
+SMM is intentionally opaque to the rest of the system:
+- **SmmLock** Typically set early in DXE, this bit locks SMRAM so it can no longer be read from or written to from outside of SMM.
+- **SMRAM** This is just normal DRAM that has been marked as SMRAM (via SMM_BASE and SMM_MASK). The CPU can only access it via #SMI. Outside of SMM, DMA can also access this range.
+
+Motherboard Manufacutre's incompetence:
+- **TPM 2.0** Either doesn't work properly or PCRs 0-7 are garbage.
+- **Secureboot** Outside of the OS loader, virtually no images executing in DXE are validated.
+
+So if malicious software is implanted into the SMM handler, you're left with heuristics or directly calling the handler yourself.
+
+---
+
+## Core idea
+The x86 interrupt priority hierarchy is well-defined: Machine Check (MC) > System Management Interrupt (SMI) > Non-Maskable Interrupt (NMI) > Maskable Interrupt (INTR).
+When a higher-priority interrupt arrives while a lower-priority interrupt handler is executing, the processor immediately preempts the current handler to service the higher-priority one.
+This preemption behavior can be exploited to detect the servicing of the SMI from within an NMI handler. The technique involves creating an SMI honeypot using a PAUSE loop, while monitoring the instruction retirement counts via MSR 0xC00000E9 (IRPerfCount). Since this counter is read-only outside of SVM and cannot be directly modified, the only control available is enabling or disabling it via MSR 0xC0010015 (IRPerfEn). As a result, any unexpected delta in the counter value reliably indicates that an SMI has occurred.
+This detection method is effective on processors supporting IRPerfCount (checkable via CPUID FeatureExtIdEbx), provided the expected instruction delta is calibrated for each manufacturer and major firmware revision.
