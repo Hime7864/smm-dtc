@@ -45,12 +45,23 @@ The NMI honeypot logic is the same on both vendors: spin in a `PAUSE` loop insid
 
 Validated on two machines:
 
-**Desktop (AMD)**  
+**Desktop (AMD)** - uncompromised
 - Processor: AMD Ryzen 7 9800X3D (8 cores, 16 logical processors @ 4700 MHz)  
 - Baseboard: ROG STRIX B850-F GAMING WIFI  
 - delta ~20000 +- 12500
 
-**Laptop (Intel)**  
+**Laptop (AMD)** - uncompromised
+- Processor: AMD Ryzen 9 270 w/ Radeon 780M Graphics, 4001 Mhz, 8 Core(s), 16 Logical Processor(s)
+- Baseboard: GA403UM
+- delta ~20000 +- 12500
+
+**Laptop (Intel)** - uncompromised
 - Processor: Intel Core Ultra 9 275HX (24 cores, 24 logical processors @ 2700 MHz)  
 - Baseboard: LNVNB161216  
-- delta 1.5m - 400k (laptop are not a concern for smm abuse because of the lack of a flash-back button)
+- delta 1.5m - 400k (laptop are not a concern for smm abuse because of the lack of a flash-back button & pc unuseable at this delta)
+
+**Desktop (Intel)** - uncompromised
+- Processor: 13th Gen Intel(R) Core(TM) i5-13600KF, 3500 Mhz, 14 Core(s), 20 Logical Processor(s)  
+- Baseboard: B760M GAMING WIFI6 PLUS GEN5  
+- delta ~25000 +- 20000
+
