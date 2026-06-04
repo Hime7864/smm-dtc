@@ -469,7 +469,6 @@ bool is_intel_cpu()
 
 namespace Intel
 {
-
     struct MSR_FIXED_CTR0
     {
         union
@@ -497,19 +496,58 @@ namespace Intel
                 UINT64 IA32_FIXED_CTR2 : 1;
                 UINT64 Reserved1 : 29;
             };
-		};
+        };
+    };
+
+    struct MSR_FIXED_CTR_CTRL
+    {
+        union
+        {
+            UINT64 AsUINT64;
+            struct
+            {
+                UINT64 Cntr0_enable : 1;
+                UINT64 Cntr0_ring : 2;
+                UINT64 Cntr0_pmi : 1;
+                UINT64 Cntr1_enable : 1;
+                UINT64 Cntr1_ring : 2;
+                UINT64 Cntr1_pmi : 1;
+                UINT64 Cntr2_enable : 1;
+                UINT64 Cntr2_ring : 2;
+                UINT64 Cntr2_pmi : 1;
+                UINT64 Reserved0 : 56;
+            };
+        };
     };
 
     struct MSR
     {
+        static constexpr UINT32 IA32_FIXED_CTR_CTRL = 0x0000038DUL;
         static constexpr UINT32 IA32_PERF_GLOBAL_CTRL = 0x0000038FUL;
-		static constexpr UINT32 IA32_FIXED_CTR0 = 0x00000309UL;
+        static constexpr UINT32 IA32_FIXED_CTR0 = 0x00000309UL;
+
+        static MSR_FIXED_CTR_CTRL NOINLINE FIXED_CTR_CTRL()
+        {
+            MSR_FIXED_CTR_CTRL result;
+            result.AsUINT64 = __readmsr(IA32_FIXED_CTR_CTRL);
+            return result;
+        }
+
+        static void NOINLINE FIXED_CTR_CTRL(MSR_FIXED_CTR_CTRL value)
+        {
+            __writemsr(IA32_FIXED_CTR_CTRL, value.AsUINT64);
+        }
 
         static MSR_PERF_GLOBAL_CTRL NOINLINE PERF_GLOBAL_CTRL()
         {
             MSR_PERF_GLOBAL_CTRL result;
-			result.AsUINT64 = __readmsr(IA32_PERF_GLOBAL_CTRL);
-			return result;
+            result.AsUINT64 = __readmsr(IA32_PERF_GLOBAL_CTRL);
+            return result;
+        }
+
+        static void NOINLINE PERF_GLOBAL_CTRL(MSR_PERF_GLOBAL_CTRL value)
+        {
+            __writemsr(IA32_PERF_GLOBAL_CTRL, value.AsUINT64);
         }
 
         static MSR_FIXED_CTR0 NOINLINE FIXED_CTR0()
@@ -518,7 +556,6 @@ namespace Intel
             result.AsUINT64 = __readmsr(IA32_FIXED_CTR0);
             return result;
         }
-        
     };
 
     struct CPUID
@@ -526,48 +563,44 @@ namespace Intel
         static bool is_pmu_supported()
         {
             //CPUID.0AH.EAX[7:0] > 0
-            //I hate how intel does their documentation couldn't 
+            //I hate how intel does their documentation couldn't
             //be bothered to put this in a bitfield
-             int cpu_info[4];
-             __cpuid(cpu_info, 0xA);
-             return (cpu_info[0] & 0xFF) > 0;
-        }
-
-        static UINT32 current_apic_id()
-        {
-			//CPUID.0BH.EDX[31:0] (Extended Topology Enumeration)
-            //Bits 31-00: x2APIC ID of the current logical processor.
             int cpu_info[4];
-             __cpuidex(cpu_info, 0xB, 0);
-			 return cpu_info[3];
-		}
+            __cpuid(cpu_info, 0xA);
+            return (cpu_info[0] & 0xFF) > 0;
+        }
     };
 
     BOOLEAN NmiCallback(
         _In_ PVOID CallbackContext,
-        _In_ BOOLEAN IsHandled
-    )
+        _In_ BOOLEAN IsHandled)
     {
-        int delta_cnt = 15014;// this number needs to be changed depending on how this is compiled
-        auto apicId = CPUID::current_apic_id();
-        auto callback_data = &((NMI_CALLBACK_DATA*)CallbackContext)[apicId];
+        _PROCESSOR_NUMBER proc_number;
+        KeGetCurrentProcessorNumberEx(&proc_number);
+
+        int delta_cnt = 15012; // this number needs to be changed depending on how this is compiled
+        auto callback_data = &((NMI_CALLBACK_DATA*)CallbackContext)[proc_number.Number];
 
         if (MSR::PERF_GLOBAL_CTRL().IA32_FIXED_CTR0)
         {
+            _mm_mfence();
+            _mm_lfence();
             auto irperf_0 = MSR::FIXED_CTR0().INST_RETIRED;
 
             for (int i = 0; i < 12500; ++i)
-                _mm_pause();// #SMI will tend to hit in here
+                _mm_pause(); // #SMI will tend to hit in here
 
-            // ensure all instructions have retired, although this msr read should sanitize anyhow
+            // ensure all instructions have retired
             _mm_mfence();
             _mm_lfence();
-
             auto irperf_1 = MSR::FIXED_CTR0().INST_RETIRED;
 
             auto score = ((irperf_1 - irperf_0) - delta_cnt);
 
-            if (score)// if IRperf reports more than expected we caught a smi
+            if ((int)score < 10 && (int)score > -10) // intel isn't as clean on AMD 
+                score = 0;
+
+            if (score) // if IRperf reports more than expected we caught a smi
             {
                 /*
                 since each core enter smm there is a wait time
@@ -597,9 +630,23 @@ namespace Intel
         return TRUE;
     }
 
+    NTSTATUS BroadcastInstRetiredEnable()
+    {
+        auto fixed_ctrl = MSR::FIXED_CTR_CTRL();
+        fixed_ctrl.Cntr0_enable = TRUE;
+        fixed_ctrl.Cntr0_ring = 3;
+        fixed_ctrl.Cntr0_pmi = FALSE;
+        MSR::FIXED_CTR_CTRL(fixed_ctrl);
+
+        auto global_ctrl = MSR::PERF_GLOBAL_CTRL();
+        global_ctrl.IA32_FIXED_CTR0 = TRUE;
+        MSR::PERF_GLOBAL_CTRL(global_ctrl);
+
+        return STATUS_SUCCESS;
+    }
+
     NTSTATUS BroadcastNmiAndRecord(
-        DISPATCH_RECORD* record
-    )
+        DISPATCH_RECORD* record)
     {
         auto numCores = KeQueryActiveProcessorCount(0);
 
@@ -724,6 +771,9 @@ namespace Intel
             return UNSUPPORTED_PROCESSOR;
         }
 
+        // Check if the processor has INST_RETIRED enabled, if not enable it
+        KeIpiGenericCall((PKIPI_BROADCAST_WORKER)BroadcastInstRetiredEnable, 0);
+
         auto record = (DISPATCH_RECORD*)ExAllocatePoolWithTag(NonPagedPool, sizeof(DISPATCH_RECORD), NMI_CB_POOL_TAG);
         if (!record)
         {
@@ -734,10 +784,10 @@ namespace Intel
         // Setting for detection
         record->BatchCount = 50;
         record->Iteration = 3;
-        record->Timeout = 1000;// ms
-        record->IrperfDeltaAvg = 25000;// limited on hardware but this is about what is expected
-        record->IrperfDeltaRange = 20000;// examples i've tested with SmmInfect show delta more than 10x this variance
-        record->SmiStormingThreshold = 3;// smi do happen however post boot, however they should be very rare
+        record->Timeout = 1000;           // ms
+        record->IrperfDeltaAvg = 25000;   // limited on hardware but this is about what is expected
+        record->IrperfDeltaRange = 20000; // examples i've tested with SmmInfect show delta more than 10x this variance
+        record->SmiStormingThreshold = 3; // smi do happen however post boot, however they should be very rare
 
         if (!NT_SUCCESS(BroadcastNmiAndRecord(record)))
             DbgPrintEx(0, 0, "[smm-dtc] Failed to broadcast NMI and record results.\n");
