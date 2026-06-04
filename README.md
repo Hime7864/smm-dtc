@@ -43,7 +43,9 @@ The NMI honeypot logic is the same on both vendors: spin in a `PAUSE` loop insid
 
 ## Tested systems
 
-Validated on two machines:
+Validated on these machines:
+
+`note: delta is the min and max per NMI, detection uses lowest of a batch of 50 NMIs per core`
 
 **Desktop (AMD)** - uncompromised
 - Processor: AMD Ryzen 7 9800X3D (8 cores, 16 logical processors @ 4700 MHz)  
