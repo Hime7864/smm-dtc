@@ -73,7 +73,7 @@ Validated on these machines:
 
 This code was tested using my custom driver base built with LLVM. Note that the timing value 15014/12 in the NMI handler will need to be adjusted when compiling under the official WDK.
 
-I outright refuse to use the stock WDK because I strongly dislike so many of its design decisions. As a result, I’ve rewritten most of the parts I use, including undocumented/unsafe internals and many AMD-specific functionality that Microsoft doesn’t expose.
+I outright refuse to use MVCV because I strongly dislike so many of its design decisions. As a result, I’ve rewritten most of the parts of WDK I use, including undocumented/unsafe internals that Microsoft doesn’t expose and many AMD-specific functionality.
 
 Regarding Lenovo’s unusually high SMI delta: I’m nearly certain it’s caused by the Absolute Persistence Module. Even when my other tool doesn’t deliberately trigger any SMIs, it still detects them firing at random intervals. It feels like there’s a separate chip or controller issuing external SMIs unpredictably. If you own a Lenovo and notice occasional stutters, this is very likely the culprit.
 
