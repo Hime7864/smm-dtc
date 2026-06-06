@@ -67,3 +67,6 @@ Validated on these machines:
 - Baseboard: B760M GAMING WIFI6 PLUS GEN5  
 - delta ~25000 +- 20000
 
+## Final Notes
+
+This code was tested via my own driver base using llvm, the time value of 15014/12 in the nmi hander will need to be change when compiled under WDK. why I don't do this myself? I hate so many of the design choices of WDK that I took it upon myself to rewrite most of the parts I use from WDK and part that arn't supported e.g. all the unsafe stuff msdn dosn't have documented and amd things too
