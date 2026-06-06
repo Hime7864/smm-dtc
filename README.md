@@ -69,4 +69,7 @@ Validated on these machines:
 
 ## Final Notes
 
-This code was tested via my own driver base using llvm, the time value of 15014/12 in the nmi hander will need to be change when compiled under WDK. why I don't do this myself? I hate so many of the design choices of WDK that I took it upon myself to rewrite most of the parts I use from WDK and part that arn't supported e.g. all the unsafe stuff msdn dosn't have documented and amd things too
+This code was tested using my custom driver base built with LLVM. Note that the timing value 15014/12 in the NMI handler will need to be adjusted when compiling under the official WDK.
+I outright refuse to use the stock WDK because I strongly dislike so many of its design decisions. As a result, I’ve rewritten most of the parts I use, including undocumented/unsafe internals and many AMD-specific functionality that Microsoft doesn’t expose.
+Regarding Lenovo’s unusually high SMI delta: I’m nearly certain it’s caused by the Absolute Persistence Module. Even when my other tool doesn’t deliberately trigger any SMIs, it still detects them firing at random intervals. It feels like there’s a separate chip or controller issuing external SMIs unpredictably. If you own a Lenovo and notice occasional stutters, this is very likely the culprit.
+Interestingly, I disabled APM in the BIOS and the random SMIs are still present. I’m not calling it spyware, but it is pretty suspicious that ~1.5 million operations are suddenly hammering a single core with no apparent reason.
