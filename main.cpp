@@ -50,7 +50,7 @@ bool is_amd_cpu()
 {
     int cpu_info[4];
     __cpuid(cpu_info, 0);
-    return cpu_info[0] >= 0x80000000 && cpu_info[1] == 'htuA';
+    return cpu_info[1] == 'htuA';
 }
 
 namespace AMD
@@ -464,7 +464,7 @@ bool is_intel_cpu()
 {
     int cpu_info[4];
     __cpuid(cpu_info, 0);
-    return cpu_info[0] >= 1 && cpu_info[1] == 'uneG';
+    return cpu_info[1] == 'uneG';
 }
 
 namespace Intel
