@@ -20,7 +20,9 @@ So if malicious software is implanted into the SMM handler, you're left with heu
 ## Core idea
 The x86 interrupt priority hierarchy is well-defined: Machine Check (MC) > System Management Interrupt (SMI) > Non-Maskable Interrupt (NMI) > Maskable Interrupt (INTR).
 When a higher-priority interrupt arrives while a lower-priority interrupt handler is executing, the processor immediately preempts the current handler to service the higher-priority one.
+
 This preemption behavior can be exploited to detect the servicing of the SMI from within an NMI handler. The technique involves creating an SMI honeypot using a PAUSE loop, while monitoring the instruction retirement counts via MSR 0xC00000E9 (IRPerfCount). Since this counter is read-only outside of SVM and cannot be directly modified, the only control available is enabling or disabling it via MSR 0xC0010015 (IRPerfEn). As a result, any unexpected delta in the counter value reliably indicates that an SMI has occurred.
+
 This detection method is effective on processors that expose an instructions-retired counter (AMD `IRPerfCount`, Intel fixed-counter `INST_RETIRED`), provided the expected instruction delta is calibrated for each manufacturer and major firmware revision.
 
 ---
@@ -70,6 +72,9 @@ Validated on these machines:
 ## Final Notes
 
 This code was tested using my custom driver base built with LLVM. Note that the timing value 15014/12 in the NMI handler will need to be adjusted when compiling under the official WDK.
+
 I outright refuse to use the stock WDK because I strongly dislike so many of its design decisions. As a result, I’ve rewritten most of the parts I use, including undocumented/unsafe internals and many AMD-specific functionality that Microsoft doesn’t expose.
+
 Regarding Lenovo’s unusually high SMI delta: I’m nearly certain it’s caused by the Absolute Persistence Module. Even when my other tool doesn’t deliberately trigger any SMIs, it still detects them firing at random intervals. It feels like there’s a separate chip or controller issuing external SMIs unpredictably. If you own a Lenovo and notice occasional stutters, this is very likely the culprit.
+
 Interestingly, I disabled APM in the BIOS and the random SMIs are still present. I’m not calling it spyware, but it is pretty suspicious that ~1.5 million operations are suddenly hammering a single core with no apparent reason.
